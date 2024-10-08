@@ -1,0 +1,158 @@
+create database keysshop_db;
+use keysshop_db;
+
+create table Usuario (
+idUsuario int auto_increment primary key,
+correo varchar(100) unique not null,
+userPassword varchar(100) not null,
+nombre varchar(50) not null,
+fechaNacimiento date not null,
+telefono varchar(30) not null,
+tipo char(1) not null,
+bajaLogica boolean default(false),
+constraint CK_TipoUsuario check(tipo= 'a' or tipo= 'c')
+);
+
+create table Direccion (
+idDireccion int auto_increment,
+idUsuario int,
+calle varchar(100) not null,
+estado varchar(100) not null,
+ciudad varchar(100) not null,
+numeroExterior varchar(20),
+numeroInterior varchar(20),
+referencia text,
+codigoPostal varchar(20),
+constraint FK_Direccion_Usuario foreign key(idUsuario) references Usuario(idUsuario) on delete cascade,
+primary key(idDireccion, idUsuario)
+);
+
+create table Producto (
+idProducto int auto_increment primary key,
+nombre varchar(50) not null,
+talle varchar(15) not null,
+precio decimal(10,2) not null,
+descripcion text
+);
+
+create table Calzado (
+idCalzado int primary key,
+constraint FK_Calzado_Producto foreign key(idCalzado) references Producto(idProducto) on delete cascade
+);
+
+create table Vestimenta (
+idVestimenta int primary key,
+constraint FK_Vestimenta_Producto foreign key(idVestimenta) references Producto(idProducto) on delete cascade
+);
+
+create table ImagenProducto (
+idImagenProducto int auto_increment primary key,
+idProducto int not null,
+titulo varchar(100) unique not null,
+URLImagen text not null,
+constraint FK_ImagenProducto_Producto foreign key(idProducto) references Producto(idProducto) on delete cascade
+);
+
+create table Categoria (
+idCategoria int auto_increment primary key,
+nombre varchar(30) unique not null
+);
+
+create table Oferta (
+idOferta int auto_increment primary key,
+nombre varchar(60) not null,
+descuento numeric(3) not null,
+estado char(1) not null,
+constraint CK_OfertaDescuento check(descuento <= 100 or descuento >= 0),
+constraint CK_OfertaEstado check(estado ='a' or estado ='d')
+);
+
+create table FormaDePago (
+idFormaDePago int auto_increment primary key,
+nombre varchar(30)
+);
+
+create table Orden(
+idOrden int auto_increment primary key,
+idUsuario int not null,
+idFormaDePago int  not null,
+fecha timestamp default(now()) not null,
+monto decimal(10,2) not null,
+constraint FK_Orden_Usuario foreign key(idUsuario) references Usuario(idUsuario),
+constraint FK_Orden_FormaDePago foreign key(idFormaDePago) references FormaDePago(idFormaDePago)
+);
+
+create table OrdenDetalle (
+idOrden int,
+idProducto int,
+cantidad numeric(4),
+precio decimal(10,2) not null,
+descuento numeric(3) not null,
+constraint FK_OrdenDetalle_Orden foreign key(idOrden) references Orden(idOrden),
+constraint FK_OrdenDetalle_Producto foreign key(idProducto) references Producto(idProducto),
+constraint CK_OrdenDetalleDescuento check(descuento <= 100 and descuento >= 0),  
+primary key(idOrden, idProducto)
+);
+
+create table Pago(
+idPago int auto_increment primary key,
+idUsuario int not null,
+idOrden int not null,
+fecha Date default(now()) not null,
+monto decimal(10,2) not null,
+constraint FK_Pago_Usuario foreign key(idUsuario) references Usuario(idUsuario),
+constraint FK_Pago_Orden foreign key(idOrden) references Orden(idOrden)
+);
+
+create table PagoPendiente (
+idPagoPendiente int auto_increment primary key,
+idOrden int not null,
+fechaLimite Date not null,
+monto decimal(10,2) not null,
+constraint FK_PagoPendiente_Orden foreign key(idOrden) references Orden(idOrden)
+);
+
+create table Carrito (
+idUsuario int,
+idProducto int,
+cantidad numeric(4) not null,
+constraint FK_Carrito_Usuario foreign key(idUsuario) references Usuario(idUsuario) on delete cascade,
+constraint FK_Carrito_Producto foreign key(idProducto) references Producto(idProducto) on delete cascade,
+primary key(idUsuario, idProducto)
+);
+
+create table ProductoCategoria (
+idProducto int,
+idCategoria int,
+constraint FK_ProductoCategoria_Producto foreign key(idProducto) references Producto(idProducto) on delete cascade,
+constraint FK_ProductoCategoria_Categoria foreign key(idCategoria) references Categoria(idCategoria)on delete cascade,
+primary key(idProducto, idCategoria)
+);
+
+create table ProductoOferta (
+idProducto int,
+idOferta int,
+constraint FK_ProductoOferta_Producto foreign key(idProducto) references Producto(idProducto)on delete cascade,
+constraint FK_ProductoOferta_Oferta foreign key(idOferta) references Oferta(idOferta) on delete cascade,
+primary key(idProducto,idOferta)
+);
+
+DELIMITER $$
+CREATE TRIGGER evaluaFechaNacimiento BEFORE INSERT ON Usuario
+FOR EACH ROW
+BEGIN
+    IF NEW.fechaNacimiento > NOW() THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'La fecha ingresada no es válida';
+    END IF;
+END 
+$$
+DELIMITER $$
+CREATE TRIGGER evaluaFechaLimite BEFORE INSERT ON PagoPendiente
+FOR EACH ROW
+BEGIN
+    IF NEW.fechaLimite <= NOW() THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'La fecha ingresada no es válida';
+    END IF;
+END $$
